@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 )
 
@@ -24,9 +25,12 @@ type response struct {
 
 func getClipboardImage() ([]byte, error) {
 	var cmd *exec.Cmd
-	if os.Getenv("WAYLAND_DISPLAY") != "" {
+	switch {
+	case runtime.GOOS == "darwin":
+		cmd = exec.Command("pngpaste", "-")
+	case os.Getenv("WAYLAND_DISPLAY") != "":
 		cmd = exec.Command("wl-paste", "--type", "image/png")
-	} else {
+	default:
 		cmd = exec.Command("xclip", "-selection", "clipboard", "-target", "image/png", "-o")
 	}
 	out, err := cmd.Output()
