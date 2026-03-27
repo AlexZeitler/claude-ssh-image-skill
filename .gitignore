@@ -1,0 +1,4 @@
+daemon/ccimgd
+daemon/ccimgd-*
+client/ccimg
+client/ccimg-*

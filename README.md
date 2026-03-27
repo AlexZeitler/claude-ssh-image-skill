@@ -22,15 +22,17 @@ Local Machine                            Remote Server (SSH)
 ```
 
 1. The `/paste-image` skill runs the `ccimg` client on the remote server, which sends a TCP request to `127.0.0.1:9998` (forwarded through the SSH reverse tunnel to the local machine)
-2. `ccimgd` reads the PNG image from the local clipboard (`wl-paste` on Wayland, `xclip` on X11)
+2. `ccimgd` reads the PNG image from the local clipboard (`wl-paste` on Wayland, `xclip` on X11, `pngpaste` on macOS)
 3. The image is returned as base64-encoded JSON
 4. `ccimg` saves it as a temporary PNG file and prints the path
 5. The skill uses Claude's `Read` tool to display the image
 
 ## Requirements
 
-- **Local machine**: `wl-paste` (Wayland, part of `wl-clipboard`) or `xclip` (X11), Go (only for building)
+- **Local machine (Linux)**: `wl-paste` (Wayland, part of `wl-clipboard`) or `xclip` (X11)
+- **Local machine (macOS)**: `pngpaste` (`brew install pngpaste`)
 - **Remote server**: Claude Code
+- **Building from source**: Go
 
 ## Building
 
@@ -40,19 +42,28 @@ Build both binaries (daemon + client):
 ./build.sh
 ```
 
-This produces `daemon/ccimgd` and `client/ccimg` as statically linked binaries with no runtime dependencies.
+This builds statically linked binaries for all supported platforms:
+
+- `daemon/ccimgd-linux-amd64`, `daemon/ccimgd-darwin-amd64`, `daemon/ccimgd-darwin-arm64`
+- `client/ccimg-linux-amd64`, `client/ccimg-darwin-amd64`, `client/ccimg-darwin-arm64`
 
 ## Setup
 
-### Local machine
-
-Install the daemon:
+### Local machine (Linux)
 
 ```bash
-cp daemon/ccimgd ~/.local/bin/
+cp daemon/ccimgd-linux-amd64 ~/.local/bin/ccimgd
 cp daemon/ccimgd.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now ccimgd
+```
+
+### Local machine (macOS)
+
+```bash
+cp daemon/ccimgd-darwin-arm64 /usr/local/bin/ccimgd   # or ccimgd-darwin-amd64 for Intel
+cp daemon/com.ccimgd.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.ccimgd.plist
 ```
 
 ### Remote server
@@ -60,7 +71,7 @@ systemctl --user enable --now ccimgd
 Copy the client binary and skill to the remote server:
 
 ```bash
-scp client/ccimg your-server:~/.local/bin/
+scp client/ccimg-linux-amd64 your-server:~/.local/bin/ccimg
 scp skill/paste-image.md your-server:~/.claude/commands/paste-image.md
 ```
 
