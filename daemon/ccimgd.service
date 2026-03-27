@@ -1,0 +1,12 @@
+[Unit]
+Description=Clipboard image daemon for Claude Code over SSH
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/ccimgd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
