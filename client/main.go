@@ -28,7 +28,21 @@ func main() {
 	}
 	defer conn.Close()
 
-	_, err = conn.Write([]byte("{}\n"))
+	token, err := loadToken()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load auth token: %v\n", err)
+		os.Exit(1)
+	}
+
+	req := map[string]string{"token": token}
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to marshal request: %v\n", err)
+		os.Exit(1)
+	}
+	reqData = append(reqData, '\n')
+
+	_, err = conn.Write(reqData)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to send request: %v\n", err)
 		os.Exit(1)

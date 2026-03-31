@@ -9,7 +9,9 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -43,19 +45,46 @@ func getClipboardImage() ([]byte, error) {
 func handleConn(conn net.Conn) {
 	defer conn.Close()
 
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+
+	remoteAddr := conn.RemoteAddr().String()
 	buf := make([]byte, 4096)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil || n == 0 {
+	totalRead := 0
+
+	for totalRead < len(buf) {
+		n, err := conn.Read(buf[totalRead:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Connection from %s: read error: %v\n", remoteAddr, err)
 			return
 		}
-		for _, b := range buf[:n] {
+		totalRead += n
+		for _, b := range buf[:totalRead] {
 			if b == '\n' {
 				goto ready
 			}
 		}
 	}
+	fmt.Fprintf(os.Stderr, "Connection from %s: buffer overflow, dropping\n", remoteAddr)
+	return
+
 ready:
+	request := strings.TrimSpace(string(buf[:totalRead]))
+
+	var req map[string]string
+	json.Unmarshal([]byte(request), &req)
+	reqToken := req["token"]
+
+	if !validateToken(reqToken) {
+		fmt.Fprintf(os.Stderr, "Connection from %s: auth failed (token hash: %s)\n", remoteAddr, hashToken(reqToken))
+		resp := response{OK: false, Error: "unauthorized"}
+		data, _ := json.Marshal(resp)
+		data = append(data, '\n')
+		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		conn.Write(data)
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Connection from %s: authenticated (token hash: %s)\n", remoteAddr, hashToken(reqToken))
 
 	var resp response
 	imgData, err := getClipboardImage()
@@ -67,6 +96,7 @@ ready:
 
 	data, _ := json.Marshal(resp)
 	data = append(data, '\n')
+	conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	conn.Write(data)
 }
 
