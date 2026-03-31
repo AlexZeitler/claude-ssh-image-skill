@@ -7,6 +7,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 const (
@@ -18,6 +20,27 @@ type response struct {
 	OK    bool   `json:"ok"`
 	Image string `json:"image"`
 	Error string `json:"error"`
+}
+
+func cleanupTempFiles() {
+	dir := os.TempDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, "clipboard-") && strings.HasSuffix(name, ".png") {
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			// Only clean up files older than 5 minutes
+			if time.Since(info.ModTime()) > 5*time.Minute {
+				os.Remove(filepath.Join(dir, name))
+			}
+		}
+	}
 }
 
 func main() {
@@ -83,11 +106,32 @@ done:
 		os.Exit(1)
 	}
 
-	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("clipboard-%d.png", os.Getpid()))
-	if err := os.WriteFile(tmpFile, imgData, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write image: %v\n", err)
+	// Clean up previous temp files from this client
+	cleanupTempFiles()
+
+	// Use exclusive temp file creation to prevent symlink races
+	tmpFile, err := os.CreateTemp("", "clipboard-*.png")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create temp file: %v\n", err)
+		os.Exit(1)
+	}
+	tmpPath := tmpFile.Name()
+
+	// Restrict to owner-only before writing data
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		fmt.Fprintf(os.Stderr, "Failed to set permissions: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println(tmpFile)
+	if _, err := tmpFile.Write(imgData); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		fmt.Fprintf(os.Stderr, "Failed to write image: %v\n", err)
+		os.Exit(1)
+	}
+	tmpFile.Close()
+
+	fmt.Println(tmpPath)
 }
