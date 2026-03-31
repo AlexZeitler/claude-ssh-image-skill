@@ -66,6 +66,8 @@ cp daemon/com.ccimgd.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.ccimgd.plist
 ```
 
+> **Note:** The plist includes `PATH` with `/opt/homebrew/bin` so `pngpaste` is found. If you installed Homebrew elsewhere, edit the `EnvironmentVariables` section in the plist.
+
 ### Remote server
 
 Copy the client binary and skill to the remote server:
