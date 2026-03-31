@@ -73,6 +73,7 @@ Copy the client binary and skill to the remote server:
 ```bash
 scp client/ccimg-linux-amd64 your-server:~/.local/bin/ccimg
 scp skill/paste-image.md your-server:~/.claude/commands/paste-image.md
+scp ~/.ccimgd-token your-server:~/.ccimgd-token
 ```
 
 To avoid permission prompts each time, add this to `~/.claude/settings.json`:
@@ -109,6 +110,34 @@ In Claude Code on the remote server, copy an image to the clipboard on your loca
 ```
 /paste-image
 ```
+
+## Security
+
+### Authentication
+
+The daemon and client authenticate using a shared secret token stored in `~/.ccimgd-token` (generated automatically on first run). The token file is created with `0600` permissions (owner-only).
+
+To copy the token to a remote server:
+
+```bash
+scp ~/.ccimgd-token your-server:~/.ccimgd-token
+```
+
+To override the token file location, set the `CCIMGD_TOKEN_FILE` environment variable on both daemon and client.
+
+To rotate the token:
+
+```bash
+rm ~/.ccimgd-token        # delete on local machine
+scp ~/.ccimgd-token your-server:~/.ccimgd-token  # re-copy after daemon regenerates
+```
+
+### Connection security
+
+- The daemon only listens on `127.0.0.1:9998` (localhost)
+- The SSH reverse tunnel provides transport encryption
+- Connections have a 10-second read timeout and 4096-byte buffer limit
+- All clipboard access is logged to the daemon's stderr with connection source and token hash
 
 ## Comparison with sshimg.nvim
 
